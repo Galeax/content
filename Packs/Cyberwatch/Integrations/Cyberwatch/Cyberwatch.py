@@ -612,6 +612,7 @@ def iso8601_to_human(iso8601_str, default_value=""):
 
     return default_value
 
+
 def to_utc(dt_str: str) -> datetime:
     """
     Converts an ISO 8601 or Z date string to a UTC **aware** datetime.
@@ -623,6 +624,7 @@ def to_utc(dt_str: str) -> datetime:
     else:
         dt = dt.astimezone(timezone.utc)
     return dt
+
 
 def _as_list(value):
     """Allows accepting either a single value or a JSON list."""
@@ -656,7 +658,7 @@ def cve_passes_filters(cve: dict, filt: dict) -> bool:
         return False
     if filt.get("active") is True and not cve.get("active", True):
         return False
-    
+
     if filt.get("ignored", False) is False and cve.get("ignored", False):
         return False
     if filt.get("ignored") is True and not cve.get("ignored", False):
@@ -677,6 +679,7 @@ def cve_passes_filters(cve: dict, filt: dict) -> bool:
 
     return not ((min_epss := filt.get("min_epss")) is not None and epss < float(min_epss))
 
+
 def fetch_incidents(client: Client, params: dict[str, Any]) -> None:
     """
     Scheduler entry-point.
@@ -686,19 +689,19 @@ def fetch_incidents(client: Client, params: dict[str, Any]) -> None:
     ─ Builds incidents up to `max_fetch`, updates last_run, pushes incidents.
     """
     first_fetch = params.get("first_fetch", "3 days")
-    max_fetch   = min(int(params.get("max_fetch", 200)), FETCH_LIMIT_MAX)
+    max_fetch = min(int(params.get("max_fetch", 200)), FETCH_LIMIT_MAX)
 
     asset_filters = json.loads(params.get("asset_filters", "{}") or "{}")
-    cve_filters   = json.loads(params.get("cve_filters", "{}") or '{"ignored": false}')
+    cve_filters = json.loads(params.get("cve_filters", "{}") or '{"ignored": false}')
 
-    last_run   = demisto.getLastRun() or {}
-    timestamp  = last_run.get("time")
+    last_run = demisto.getLastRun() or {}
+    timestamp = last_run.get("time")
     if timestamp is None:
         start_ms, _ = parse_date_range(first_fetch, to_timestamp=True)
-        timestamp   = int(start_ms / 1000)
-    
+        timestamp = int(start_ms / 1000)
+
     current_fetch_time = int(datetime.now(timezone.utc).timestamp())
-    
+
     incidents: list[dict] = []
     list_assets = client.get_assets(asset_filters)
     for asset in list_assets:
@@ -726,20 +729,24 @@ def fetch_incidents(client: Client, params: dict[str, Any]) -> None:
                 "prioritized": false
             },
             """
-            incidents.append({
-                "name": f"{cve['cve_code']} on {asset['hostname']}",
-                "occurred": datetime.utcfromtimestamp(detected_ts).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "rawJSON": json.dumps({
-                    "cve":                      cve["cve_code"],
-                    "score":                    cve["score"],
-                    "environmental_score":      cve.get("environmental_score"),
-                    "epss":                     cve.get("epss"),
-                    "ignored":                  cve.get("ignored", False),
-                    "active":                   cve.get("active", True),
-                    "detected_at":              cve.get("detected_at"),
-                    "prioritized":              cve.get("prioritized", False),
-                }),
-            })
+            incidents.append(
+                {
+                    "name": f"{cve['cve_code']} on {asset['hostname']}",
+                    "occurred": datetime.utcfromtimestamp(detected_ts).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "rawJSON": json.dumps(
+                        {
+                            "cve": cve["cve_code"],
+                            "score": cve["score"],
+                            "environmental_score": cve.get("environmental_score"),
+                            "epss": cve.get("epss"),
+                            "ignored": cve.get("ignored", False),
+                            "active": cve.get("active", True),
+                            "detected_at": cve.get("detected_at"),
+                            "prioritized": cve.get("prioritized", False),
+                        }
+                    ),
+                }
+            )
 
             if len(incidents) >= max_fetch:
                 break
@@ -748,7 +755,8 @@ def fetch_incidents(client: Client, params: dict[str, Any]) -> None:
 
     demisto.incidents(incidents)
     demisto.setLastRun({"time": current_fetch_time})
-    
+
+
 def list_cves_command(client: Client, args: Dict[str, Any]):
     """
     List CVEs.
